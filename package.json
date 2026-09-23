@@ -1,0 +1,34 @@
+{
+  "name": "openpave-jev",
+  "version": "0.1.0",
+  "description": "PAVE skill for non-autoregressive decision models (Jev / Laya / OpenJev): typed Choice, Score and Noul answers with calibrated probabilities",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [
+    "pave",
+    "openpave",
+    "jev",
+    "laya",
+    "decision-model",
+    "system-one",
+    "non-autoregressive",
+    "classification",
+    "calibration"
+  ],
+  "author": "cnrai",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cnrai/openpave-jev.git"
+  },
+  "homepage": "https://github.com/cnrai/openpave-jev#readme",
+  "bugs": {
+    "url": "https://github.com/cnrai/openpave-jev/issues"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

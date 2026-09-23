@@ -1,0 +1,104 @@
+# OpenPAVE Jev Skill
+# Typed decisions (Choice / Score / Noul) from non-autoregressive decision models:
+# local Laya (open weights, Apache-2.0), any Jev-compatible /v1/systemone HTTP server,
+# or the TypeSafe Jev API. Zero-dependency core; Laya engine installs on demand.
+
+name: jev
+version: 0.1.0
+description: Ask non-autoregressive decision models for typed answers with calibrated probabilities - classify, route, score and gate without an LLM round-trip
+
+author:
+  name: cnrai
+  url: https://github.com/cnrai
+
+license: MIT
+homepage: https://github.com/cnrai/openpave-jev
+repository: cnrai/openpave-jev
+
+# Execution pattern
+pattern: sandbox
+entrypoint: index.js
+
+# Available commands
+commands:
+  - name: decide
+    description: Ask a choice question - state in, best option + probability distribution out
+    options:
+      - -s, --state <text|@file|->
+      - --state-json <json|@file>
+      - -c, --choices <"a,b,c">
+      - --criteria <json|"key:desc,...">
+      - -i, --instructions <text>
+      - -n, --name <questionName>
+      - -p, --provider <mock|laya|http|typesafe>
+      - --checkpoint <english|multilingual|typed-decisions>
+      - --base-url <url>
+      - --min-confidence <p>
+      - --no-calibrate
+      - -q, --quiet
+
+  - name: score
+    description: Ask a score question - expected level on an ordered rubric with distribution
+    options:
+      - -s, --state <text|@file|->
+      - --state-json <json|@file>
+      - -l, --levels <"lo,mid,hi">
+      - -i, --instructions <text>
+      - -n, --name <questionName>
+      - -p, --provider <mock|laya|http|typesafe>
+      - --checkpoint <english|multilingual|typed-decisions>
+      - --base-url <url>
+      - --min-confidence <p>
+      - --no-calibrate
+      - -q, --quiet
+
+  - name: noul
+    description: Ask a yes/no question - calibrated P(true)
+    options:
+      - -s, --state <text|@file|->
+      - --state-json <json|@file>
+      - -i, --instructions <text>
+      - -n, --name <questionName>
+      - -p, --provider <mock|laya|http|typesafe>
+      - --checkpoint <english|multilingual|typed-decisions>
+      - --base-url <url>
+      - --min-confidence <p>
+      - --no-calibrate
+      - -q, --quiet
+
+  - name: ask
+    description: Send a full request file ({state, questions}) - all question types in one forward pass
+    options:
+      - -f, --file <json|@file|->
+      - -p, --provider <mock|laya|http|typesafe>
+      - --checkpoint <english|multilingual|typed-decisions>
+      - --base-url <url>
+      - --no-calibrate
+
+  - name: eval
+    description: Evaluate a labeled dataset - accuracy, soft accuracy, Brier, ECE per primitive and per question
+    options:
+      - -f, --file <labeled.json>
+      - -p, --provider <mock|laya|http|typesafe>
+      - --checkpoint <english|multilingual|typed-decisions>
+      - --base-url <url>
+      - --no-calibrate
+      - --json
+
+  - name: calibrate
+    description: Fit per-bucket temperatures on a labeled dataset and save to JEV_HOME/calibration.json (applied automatically afterwards)
+    options:
+      - -f, --file <labeled.json>
+      - -p, --provider <mock|laya|http|typesafe>
+      - --checkpoint <english|multilingual|typed-decisions>
+      - --base-url <url>
+      - -o, --out <path>
+
+  - name: providers
+    description: Show driver status - which providers are available and why
+
+  - name: setup
+    description: "Install optional engines (currently: laya = @receptron/laya ONNX runtime)"
+    options:
+      - -e, --engine <laya>
+      - --skip-check
