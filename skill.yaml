@@ -4,7 +4,7 @@
 # or the TypeSafe Jev API. Zero-dependency core; Laya engine installs on demand.
 
 name: jev
-version: 0.1.0
+version: 0.1.1
 description: Ask non-autoregressive decision models for typed answers with calibrated probabilities - classify, route, score and gate without an LLM round-trip
 
 author:
@@ -24,10 +24,10 @@ commands:
   - name: decide
     description: Ask a choice question - state in, best option + probability distribution out
     options:
-      - -s, --state <text|@file|->
-      - --state-json <json|@file>
+      - -s, --state <text>
+      - --state-json <json>
       - -c, --choices <"a,b,c">
-      - --criteria <json|"key:desc,...">
+      - --criteria <json>
       - -i, --instructions <text>
       - -n, --name <questionName>
       - -p, --provider <mock|laya|http|typesafe>
@@ -40,8 +40,8 @@ commands:
   - name: score
     description: Ask a score question - expected level on an ordered rubric with distribution
     options:
-      - -s, --state <text|@file|->
-      - --state-json <json|@file>
+      - -s, --state <text>
+      - --state-json <json>
       - -l, --levels <"lo,mid,hi">
       - -i, --instructions <text>
       - -n, --name <questionName>
@@ -55,8 +55,8 @@ commands:
   - name: noul
     description: Ask a yes/no question - calibrated P(true)
     options:
-      - -s, --state <text|@file|->
-      - --state-json <json|@file>
+      - -s, --state <text>
+      - --state-json <json>
       - -i, --instructions <text>
       - -n, --name <questionName>
       - -p, --provider <mock|laya|http|typesafe>
@@ -69,7 +69,7 @@ commands:
   - name: ask
     description: Send a full request file ({state, questions}) - all question types in one forward pass
     options:
-      - -f, --file <json|@file|->
+      - -f, --file <json>
       - -p, --provider <mock|laya|http|typesafe>
       - --checkpoint <english|multilingual|typed-decisions>
       - --base-url <url>
