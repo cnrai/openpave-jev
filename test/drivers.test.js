@@ -70,3 +70,13 @@ test('providerStatus: rows list all four providers and select without throwing',
     assert.ok(status.rows.every((r) => typeof r.available === 'boolean' && typeof r.detail === 'string'));
   });
 });
+
+test('providerStatus: not-installed laya detail gives both PATH and clone command forms (#2)', () => {
+  withEnv({}, () => {
+    const status = drivers.providerStatus();
+    const laya = status.rows.find((r) => r.provider === 'laya');
+    if (laya.available) return; // engine installed on this machine; detail is the installed form
+    assert.match(laya.detail, /jev setup laya/, 'PATH/npm install form');
+    assert.match(laya.detail, /index\.js setup laya/, 'clone install form');
+  });
+});
