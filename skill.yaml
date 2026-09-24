@@ -4,7 +4,7 @@
 # or the TypeSafe Jev API. Zero-dependency core; Laya engine installs on demand.
 
 name: jev
-version: 0.1.1
+version: 0.2.0
 description: Ask non-autoregressive decision models for typed answers with calibrated probabilities - classify, route, score and gate without an LLM round-trip
 
 author:
