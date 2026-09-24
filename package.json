@@ -3,6 +3,9 @@
   "version": "0.1.1",
   "description": "PAVE skill for non-autoregressive decision models (Jev / Laya / OpenJev): typed Choice, Score and Noul answers with calibrated probabilities",
   "main": "index.js",
+  "bin": {
+    "jev": "index.js"
+  },
   "type": "commonjs",
   "scripts": {
     "test": "node --test test/*.test.js"
