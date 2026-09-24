@@ -1,4 +1,4 @@
-# jev — typed decisions for PAVE
+# jev — typed decisions for PAVE and Claude
 
 Ask **non-autoregressive decision models** for typed answers with calibrated
 probabilities: classify, route, score and gate **without an LLM round-trip**.
