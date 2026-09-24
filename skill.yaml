@@ -14,6 +14,7 @@ author:
 license: MIT
 homepage: https://github.com/cnrai/openpave-jev
 repository: cnrai/openpave-jev
+category: development
 
 # Execution pattern
 pattern: sandbox
