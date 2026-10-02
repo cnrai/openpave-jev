@@ -92,8 +92,59 @@ test('http.ask rejects on non-JSON response', async () => {
   }
 });
 
-test('resolveBase: opts override env, trailing slashes stripped', () => {
-  const saved = process.env.JEV_BASE_URL;
+test('http.ask sends opts.path and opts.model when provided (epm/decisions shape)', async () => {
+  const seen = [];
+  const state = { document: 'hello' };
+  const { server, base } = await startFixture((req, res) => {
+    let body = '';
+    req.on('data', (c) => (body += c));
+    req.on('end', () => {
+      seen.push({ method: req.method, url: req.url, auth: req.headers.authorization, body: JSON.parse(body) });
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ answers: {}, usage: { input_tokens: 0 } }));
+    });
+  });
+  try {
+    const result = await httpDriver.ask(state, { q: { type: 'noul' } }, {
+      baseUrl: base,
+      path: '/v1/decisions',
+      model: 'cnrai/laya-english',
+      apiKey: 'sk-test',
+    });
+    assert.strictEqual(seen.length, 1);
+    assert.strictEqual(seen[0].method, 'POST');
+    assert.strictEqual(seen[0].url, '/v1/decisions', 'path override replaces /v1/systemone');
+    assert.strictEqual(seen[0].body.model, 'cnrai/laya-english', 'model field is included in the body');
+    assert.deepStrictEqual(seen[0].body.state, state);
+    assert.strictEqual(seen[0].auth, 'Bearer sk-test');
+    assert.ok(Number.isFinite(result.latency_ms));
+  } finally {
+    await closeFixture(server);
+  }
+});
+
+test('http.ask omits model and uses /v1/systemone when opts.path/model are absent (backward compat)', async () => {
+  const seen = [];
+  const { server, base } = await startFixture((req, res) => {
+    let body = '';
+    req.on('data', (c) => (body += c));
+    req.on('end', () => {
+      seen.push({ url: req.url, body: JSON.parse(body) });
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ answers: {}, usage: {} }));
+    });
+  });
+  try {
+    await httpDriver.ask({}, { q: { type: 'noul' } }, { baseUrl: base, apiKey: 'sk-test' });
+    assert.strictEqual(seen.length, 1);
+    assert.strictEqual(seen[0].url, '/v1/systemone', 'default path is /v1/systemone');
+    assert.ok(!('model' in seen[0].body), 'no model field when opts.model is absent');
+  } finally {
+    await closeFixture(server);
+  }
+});
+
+test('resolveBase: opts override env, trailing slashes stripped', () => {  const saved = process.env.JEV_BASE_URL;
   try {
     process.env.JEV_BASE_URL = 'http://env.example/';
     assert.strictEqual(httpDriver.resolveBase({}), 'http://env.example');

@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const drivers = require('../lib/drivers');
 
-const ENV_KEYS = ['JEV_MOCK', 'JEV_PROVIDER', 'JEV_BASE_URL', 'JEV_API_KEY'];
+const ENV_KEYS = ['JEV_MOCK', 'JEV_PROVIDER', 'JEV_BASE_URL', 'JEV_API_KEY', 'JEV_EPM_URL', 'JEV_MODEL'];
 
 /** Run fn with a controlled JEV_* environment; restores everything after. */
 function withEnv(overrides, fn) {
@@ -30,6 +30,7 @@ test('resolveProvider: explicit name wins over the environment', () => {
     assert.strictEqual(drivers.resolveProvider('typesafe').name, 'typesafe');
     assert.strictEqual(drivers.resolveProvider('http').name, 'http');
     assert.strictEqual(drivers.resolveProvider('laya').name, 'laya');
+    assert.strictEqual(drivers.resolveProvider('epm').name, 'epm');
   });
 });
 
@@ -38,6 +39,14 @@ test('resolveProvider: JEV_MOCK=1 forces mock from auto', () => {
     const p = drivers.resolveProvider(null);
     assert.strictEqual(p.name, 'mock');
     assert.ok(/JEV_MOCK/.test(p.note));
+  });
+});
+
+test('resolveProvider: auto prefers JEV_EPM_URL over JEV_BASE_URL (epm gateway first)', () => {
+  withEnv({ JEV_EPM_URL: 'http://epm.example.com', JEV_BASE_URL: 'http://127.0.0.1:8000' }, () => {
+    const p = drivers.resolveProvider(null);
+    assert.strictEqual(p.name, 'epm');
+    assert.ok(/JEV_EPM_URL/.test(p.note));
   });
 });
 
@@ -57,18 +66,55 @@ test('resolveProvider: explicit JEV_PROVIDER env is honored', () => {
 
 test('resolveProvider: unknown provider throws with the legal set', () => {
   withEnv({}, () => {
-    assert.throws(() => drivers.resolveProvider('nope'), /unknown provider "nope" \(expected mock\|laya\|http\|typesafe\)/);
+    assert.throws(() => drivers.resolveProvider('nope'), /unknown provider "nope" \(expected mock\|laya\|http\|typesafe\|epm\)/);
   });
 });
 
-test('providerStatus: rows list all four providers and select without throwing', () => {
+test('providerStatus: rows list all five providers and select without throwing', () => {
   withEnv({ JEV_MOCK: '1' }, () => {
     const status = drivers.providerStatus();
     assert.strictEqual(status.selected, 'mock');
     const names = status.rows.map((r) => r.provider).sort();
-    assert.deepStrictEqual(names, ['http', 'laya', 'mock', 'typesafe']);
+    assert.deepStrictEqual(names, ['epm', 'http', 'laya', 'mock', 'typesafe']);
     assert.ok(status.rows.every((r) => typeof r.available === 'boolean' && typeof r.detail === 'string'));
   });
+});
+
+test('epm provider: epmAsk sends {model, state, questions} to /v1/decisions with the EPM base URL', async () => {
+  const http = require('http');
+  const seen = [];
+  const server = await new Promise((resolve) => {
+    const s = http.createServer((req, res) => {
+      let body = '';
+      req.on('data', (c) => (body += c));
+      req.on('end', () => {
+        seen.push({ method: req.method, url: req.url, auth: req.headers.authorization, body: JSON.parse(body) });
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ answers: { q1: { type: 'noul', noul: 0.9, confidence: 0.9 } }, usage: { input_tokens: 5 } }));
+      });
+    });
+    s.listen(0, '127.0.0.1', () => resolve(s));
+  });
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const savedEpm = process.env.JEV_EPM_URL;
+  const savedKey = process.env.JEV_API_KEY;
+  try {
+    process.env.JEV_EPM_URL = base;
+    process.env.JEV_API_KEY = 'sk-pave-test';
+    const provider = drivers.resolveProvider(null);
+    assert.strictEqual(provider.name, 'epm');
+    const result = await provider.ask({ text: 'hello' }, { q1: { type: 'noul' } }, {});
+    assert.strictEqual(seen.length, 1);
+    assert.strictEqual(seen[0].method, 'POST');
+    assert.strictEqual(seen[0].url, '/v1/decisions', 'epm provider posts to /v1/decisions');
+    assert.strictEqual(seen[0].auth, 'Bearer sk-pave-test', 'epm provider uses JEV_API_KEY for auth');
+    assert.strictEqual(seen[0].body.model, 'cnrai/laya-english', 'default model is cnrai/laya-english');
+    assert.strictEqual(result.provider, 'epm:' + base);
+  } finally {
+    if (savedEpm === undefined) delete process.env.JEV_EPM_URL; else process.env.JEV_EPM_URL = savedEpm;
+    if (savedKey === undefined) delete process.env.JEV_API_KEY; else process.env.JEV_API_KEY = savedKey;
+    await new Promise((resolve) => { if (server.closeAllConnections) server.closeAllConnections(); server.close(() => resolve()); });
+  }
 });
 
 test('providerStatus: not-installed laya detail gives both PATH and clone command forms (#2)', () => {

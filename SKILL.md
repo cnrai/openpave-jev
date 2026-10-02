@@ -26,34 +26,34 @@ both state flags also accept `@file` and `-` (stdin).
   distribution out.
   Options: `-s, --state <text>`, `--state-json <json>`, `-c, --choices <"a,b,c">`,
   `--criteria <json>`, `-i, --instructions <text>`, `-n, --name <questionName>`,
-  `-p, --provider <mock|laya|http|typesafe>`,
+  `-p, --provider <mock|laya|http|typesafe|epm>`,
   `--checkpoint <english|multilingual|typed-decisions>`, `--base-url <url>`,
   `--min-confidence <p>`, `--no-calibrate`, `-q, --quiet`
 - **score** — ask a score question: expected level on an ordered rubric with
   distribution.
   Options: `-s, --state <text>`, `--state-json <json>`, `-l, --levels <"lo,mid,hi">`,
   `-i, --instructions <text>`, `-n, --name <questionName>`,
-  `-p, --provider <mock|laya|http|typesafe>`,
+  `-p, --provider <mock|laya|http|typesafe|epm>`,
   `--checkpoint <english|multilingual|typed-decisions>`, `--base-url <url>`,
   `--min-confidence <p>`, `--no-calibrate`, `-q, --quiet`
 - **noul** — ask a yes/no question: calibrated P(true).
   Options: `-s, --state <text>`, `--state-json <json>`, `-i, --instructions <text>`,
-  `-n, --name <questionName>`, `-p, --provider <mock|laya|http|typesafe>`,
+  `-n, --name <questionName>`, `-p, --provider <mock|laya|http|typesafe|epm>`,
   `--checkpoint <english|multilingual|typed-decisions>`, `--base-url <url>`,
   `--min-confidence <p>`, `--no-calibrate`, `-q, --quiet`
 - **ask** — send a full request file `{state, questions}` — all question types
   in one forward pass.
-  Options: `-f, --file <json>`, `-p, --provider <mock|laya|http|typesafe>`,
+  Options: `-f, --file <json>`, `-p, --provider <mock|laya|http|typesafe|epm>`,
   `--checkpoint <english|multilingual|typed-decisions>`, `--base-url <url>`,
   `--no-calibrate`
 - **eval** — evaluate a labeled dataset: accuracy, soft accuracy, Brier, ECE
   per primitive and per question.
-  Options: `-f, --file <labeled.json>`, `-p, --provider <mock|laya|http|typesafe>`,
+  Options: `-f, --file <labeled.json>`, `-p, --provider <mock|laya|http|typesafe|epm>`,
   `--checkpoint <english|multilingual|typed-decisions>`, `--base-url <url>`,
   `--no-calibrate`, `--json`
 - **calibrate** — fit per-bucket temperatures on a labeled dataset and save to
   `JEV_HOME/calibration.json` (applied automatically afterwards).
-  Options: `-f, --file <labeled.json>`, `-p, --provider <mock|laya|http|typesafe>`,
+  Options: `-f, --file <labeled.json>`, `-p, --provider <mock|laya|http|typesafe|epm>`,
   `--checkpoint <english|multilingual|typed-decisions>`, `--base-url <url>`,
   `-o, --out <path>`
 - **providers** — show driver status: which providers are available and why.
@@ -89,7 +89,13 @@ A fresh clone errors on every command until ONE of these is in place:
    first inference; cached in `~/.cache/receptron-laya` or `LAYA_CACHE`).
 2. `export JEV_BASE_URL=...` — hosted Laya / Jev-compatible server, zero
    local install.
-3. `-p mock` — deterministic fake for smoke tests.
+3. `export JEV_EPM_URL=...` + `export JEV_API_KEY=sk-pave-...` —
+   [pave-epm](https://github.com/candrholdings/pave-epm) Decisions API gateway
+   (`POST /v1/decisions`, OpenRouter alpha/decisions shape, `model` field
+   required). Use `JEV_MODEL` to select the checkpoint
+   (`cnrai/laya-english` | `cnrai/laya-multilingual` |
+   `cnrai/laya-typed-decisions`).
+4. `-p mock` — deterministic fake for smoke tests.
 
 ## Guidance
 
