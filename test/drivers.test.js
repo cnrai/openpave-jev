@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const drivers = require('../lib/drivers');
 
-const ENV_KEYS = ['JEV_MOCK', 'JEV_PROVIDER', 'JEV_BASE_URL', 'JEV_API_KEY', 'JEV_EPM_URL', 'JEV_MODEL'];
+const ENV_KEYS = ['JEV_MOCK', 'JEV_PROVIDER', 'JEV_BASE_URL', 'JEV_API_KEY', 'JEV_EPM_URL', 'JEV_MODEL', 'PAVE_EPM_URL', 'PAVE_EPM_TOKEN_FILE'];
 
 /** Run fn with a controlled JEV_* environment; restores everything after. */
 function withEnv(overrides, fn) {
@@ -80,7 +80,53 @@ test('providerStatus: rows list all five providers and select without throwing',
   });
 });
 
-test('epm provider: epmAsk sends {model, state, questions} to /v1/decisions with the EPM base URL', async () => {
+test('epm provider: epmAsk sends {model, state, questions} to /v1/decisions with the EPM JWT from PAVE_EPM_TOKEN_FILE', async () => {
+  const http = require('http');
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const seen = [];
+  const server = await new Promise((resolve) => {
+    const s = http.createServer((req, res) => {
+      let body = '';
+      req.on('data', (c) => (body += c));
+      req.on('end', () => {
+        seen.push({ method: req.method, url: req.url, auth: req.headers.authorization, body: JSON.parse(body) });
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ answers: { q1: { type: 'noul', noul: 0.9, confidence: 0.9 } }, usage: { input_tokens: 5 } }));
+      });
+    });
+    s.listen(0, '127.0.0.1', () => resolve(s));
+  });
+  const base = 'http://127.0.0.1:' + server.address().port;
+  // Write a fake JWT to a temp file — simulates PAVE_EPM_TOKEN_FILE
+  const tokenFile = path.join(os.tmpdir(), 'jev-test-token-' + Date.now() + '.txt');
+  fs.writeFileSync(tokenFile, 'jwt-token-from-sidecar');
+  const savedEpm = process.env.JEV_EPM_URL;
+  const savedPave = process.env.PAVE_EPM_URL;
+  const savedToken = process.env.PAVE_EPM_TOKEN_FILE;
+  try {
+    process.env.JEV_EPM_URL = base;
+    process.env.PAVE_EPM_TOKEN_FILE = tokenFile;
+    const provider = drivers.resolveProvider(null);
+    assert.strictEqual(provider.name, 'epm');
+    const result = await provider.ask({ text: 'hello' }, { q1: { type: 'noul' } }, {});
+    assert.strictEqual(seen.length, 1);
+    assert.strictEqual(seen[0].method, 'POST');
+    assert.strictEqual(seen[0].url, '/v1/decisions', 'epm provider posts to /v1/decisions');
+    assert.strictEqual(seen[0].auth, 'Bearer jwt-token-from-sidecar', 'epm provider reads the JWT from PAVE_EPM_TOKEN_FILE');
+    assert.strictEqual(seen[0].body.model, 'cnrai/laya-english', 'default model is cnrai/laya-english');
+    assert.strictEqual(result.provider, 'epm:' + base);
+  } finally {
+    if (savedEpm === undefined) delete process.env.JEV_EPM_URL; else process.env.JEV_EPM_URL = savedEpm;
+    if (savedPave === undefined) delete process.env.PAVE_EPM_URL; else process.env.PAVE_EPM_URL = savedPave;
+    if (savedToken === undefined) delete process.env.PAVE_EPM_TOKEN_FILE; else process.env.PAVE_EPM_TOKEN_FILE = savedToken;
+    fs.unlinkSync(tokenFile);
+    await new Promise((resolve) => { if (server.closeAllConnections) server.closeAllConnections(); server.close(() => resolve()); });
+  }
+});
+
+test('epm provider: falls back to JEV_API_KEY when PAVE_EPM_TOKEN_FILE is not set (standalone use)', async () => {
   const http = require('http');
   const seen = [];
   const server = await new Promise((resolve) => {
@@ -98,21 +144,19 @@ test('epm provider: epmAsk sends {model, state, questions} to /v1/decisions with
   const base = 'http://127.0.0.1:' + server.address().port;
   const savedEpm = process.env.JEV_EPM_URL;
   const savedKey = process.env.JEV_API_KEY;
+  const savedToken = process.env.PAVE_EPM_TOKEN_FILE;
   try {
     process.env.JEV_EPM_URL = base;
-    process.env.JEV_API_KEY = 'sk-pave-test';
+    process.env.JEV_API_KEY = 'sk-pave-fallback';
+    delete process.env.PAVE_EPM_TOKEN_FILE;
     const provider = drivers.resolveProvider(null);
     assert.strictEqual(provider.name, 'epm');
-    const result = await provider.ask({ text: 'hello' }, { q1: { type: 'noul' } }, {});
-    assert.strictEqual(seen.length, 1);
-    assert.strictEqual(seen[0].method, 'POST');
-    assert.strictEqual(seen[0].url, '/v1/decisions', 'epm provider posts to /v1/decisions');
-    assert.strictEqual(seen[0].auth, 'Bearer sk-pave-test', 'epm provider uses JEV_API_KEY for auth');
-    assert.strictEqual(seen[0].body.model, 'cnrai/laya-english', 'default model is cnrai/laya-english');
-    assert.strictEqual(result.provider, 'epm:' + base);
+    await provider.ask({ text: 'hello' }, { q1: { type: 'noul' } }, {});
+    assert.strictEqual(seen[0].auth, 'Bearer sk-pave-fallback', 'falls back to JEV_API_KEY when PAVE_EPM_TOKEN_FILE is not set');
   } finally {
     if (savedEpm === undefined) delete process.env.JEV_EPM_URL; else process.env.JEV_EPM_URL = savedEpm;
     if (savedKey === undefined) delete process.env.JEV_API_KEY; else process.env.JEV_API_KEY = savedKey;
+    if (savedToken === undefined) delete process.env.PAVE_EPM_TOKEN_FILE; else process.env.PAVE_EPM_TOKEN_FILE = savedToken;
     await new Promise((resolve) => { if (server.closeAllConnections) server.closeAllConnections(); server.close(() => resolve()); });
   }
 });

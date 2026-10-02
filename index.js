@@ -47,11 +47,13 @@ State input:
 
 Providers:
   --provider mock|laya|http|typesafe|epm   or JEV_PROVIDER env; auto order:
-  JEV_MOCK=1 > JEV_EPM_URL > JEV_BASE_URL > JEV_API_KEY > installed laya > error
+  JEV_MOCK=1 > PAVE_EPM_URL (or JEV_EPM_URL) > JEV_BASE_URL > JEV_API_KEY > installed laya > error
 
 Config:
-  JEV_EPM_URL          base URL of the pave-epm Decisions API (e.g. https://epm.example.com)
-  JEV_API_KEY          TypeSafe Jev API key (or JEV_API_KEY in ~/.pave/tokens.yaml; for epm, the sk-pave- key)
+  JEV_EPM_URL          base URL of the pave-epm Decisions API (overrides PAVE_EPM_URL)
+  JEV_API_KEY          TypeSafe Jev API key (or JEV_API_KEY in ~/.pave/tokens.yaml; fallback for the epm provider)
+  PAVE_EPM_URL         base URL of the EPM (set by the openpave/pave-studio sidecar on login)
+  PAVE_EPM_TOKEN_FILE  path to the EPM JWT file (set by the sidecar; the epm provider reads it for auth — no JEV_API_KEY needed when logged in)
   JEV_BASE_URL         base URL of a /v1/systemone server (e.g. http://127.0.0.1:8000)
   JEV_MODEL            decision model for the epm provider (cnrai/laya-english | cnrai/laya-multilingual | cnrai/laya-typed-decisions)
   JEV_PROVIDER         default provider

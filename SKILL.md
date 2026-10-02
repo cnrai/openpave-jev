@@ -89,12 +89,15 @@ A fresh clone errors on every command until ONE of these is in place:
    first inference; cached in `~/.cache/receptron-laya` or `LAYA_CACHE`).
 2. `export JEV_BASE_URL=...` — hosted Laya / Jev-compatible server, zero
    local install.
-3. `export JEV_EPM_URL=...` + `export JEV_API_KEY=sk-pave-...` —
+3. `PAVE_EPM_URL` + `PAVE_EPM_TOKEN_FILE` —
    [pave-epm](https://github.com/candrholdings/pave-epm) Decisions API gateway
    (`POST /v1/decisions`, OpenRouter alpha/decisions shape, `model` field
-   required). Use `JEV_MODEL` to select the checkpoint
+   required). Set automatically by the openpave/pave-studio sidecar on login —
+   the `epm` provider reads the JWT from `PAVE_EPM_TOKEN_FILE` for auth.
+   Use `JEV_MODEL` to select the checkpoint
    (`cnrai/laya-english` | `cnrai/laya-multilingual` |
-   `cnrai/laya-typed-decisions`).
+   `cnrai/laya-typed-decisions`). Fallback: `JEV_EPM_URL` + `JEV_API_KEY`
+   for standalone use.
 4. `-p mock` — deterministic fake for smoke tests.
 
 ## Guidance

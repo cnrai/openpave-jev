@@ -45,10 +45,10 @@ jev decide --provider mock -s "hello" -c "a,b,c" -q
 | `laya` | Local open-weights engine ([@receptron/laya](https://www.npmjs.com/package/@receptron/laya), Apache-2.0, ModernBERT-large, ~1.7 GB weights) | `jev setup laya` (Node 20+; weights download on first use) |
 | `http` | Any server exposing `POST /v1/systemone` (e.g. self-hosted `laya-serve`) | `export JEV_BASE_URL=http://127.0.0.1:8000` |
 | `typesafe` | The [TypeSafe Jev API](https://www.typesafe.ai) (closed, paid) | `export JEV_API_KEY=...` (or `JEV_API_KEY:` in `~/.pave/tokens.yaml`) |
-| `epm` | [pave-epm](https://github.com/candrholdings/pave-epm) Decisions API gateway (`POST /v1/decisions`, OpenRouter alpha/decisions shape, `sk-pave-` auth, `model` field required) | `export JEV_EPM_URL=https://epm.example.com` + `export JEV_API_KEY=sk-pave-...` + `export JEV_MODEL=cnrai/laya-english` |
+| `epm` | [pave-epm](https://github.com/candrholdings/pave-epm) Decisions API gateway (`POST /v1/decisions`, OpenRouter alpha/decisions shape, `model` field required) | `PAVE_EPM_URL` + `PAVE_EPM_TOKEN_FILE` (set by the openpave/pave-studio sidecar on login — no separate key); or `JEV_EPM_URL` + `JEV_API_KEY` for standalone use |
 | `mock` | Deterministic fake (hash-seeded) | nothing — `--provider mock` |
 
-Auto-selection order: `JEV_MOCK=1` → `JEV_EPM_URL` → `JEV_BASE_URL` → `JEV_API_KEY` → installed
+Auto-selection order: `JEV_MOCK=1` → `PAVE_EPM_URL` (or `JEV_EPM_URL`) → `JEV_BASE_URL` → `JEV_API_KEY` → installed
 laya → error with guidance. Self-hosted beats the paid API on purpose.
 
 ## Commands
@@ -75,10 +75,12 @@ Exit codes: `0` ok · `1` error · `2` usage · `3` below `--min-confidence`.
 
 | Variable | Meaning |
 | -------- | ------- |
-| `JEV_API_KEY` | TypeSafe Jev API key (env, or `JEV_API_KEY:` in `~/.pave/tokens.yaml`). For the `epm` provider, the `sk-pave-` EPM API key. |
+| `JEV_API_KEY` | TypeSafe Jev API key (env, or `JEV_API_KEY:` in `~/.pave/tokens.yaml). Fallback for the `epm` provider when `PAVE_EPM_TOKEN_FILE` is not set. |
 | `JEV_BASE_URL` | base URL of a `/v1/systemone` server |
-| `JEV_EPM_URL` | base URL of the pave-epm Decisions API (e.g. `https://epm.example.com`); selects the `epm` provider over `http`/`typesafe` |
+| `JEV_EPM_URL` | base URL of the pave-epm Decisions API (overrides `PAVE_EPM_URL` for the `epm` provider) |
 | `JEV_MODEL` | which decision model the `epm` provider sends (default `cnrai/laya-english`; also `cnrai/laya-multilingual`, `cnrai/laya-typed-decisions`) |
+| `PAVE_EPM_URL` | base URL of the EPM (set by the openpave/pave-studio sidecar on login; the `epm` provider auto-selects when this is set) |
+| `PAVE_EPM_TOKEN_FILE` | path to the EPM JWT file (set by the sidecar on login; the `epm` provider reads it for auth — no `JEV_API_KEY` needed when logged in) |
 | `JEV_PROVIDER` | default provider (`mock|laya|http|typesafe|epm`) |
 | `JEV_MOCK` | `1` forces the mock driver |
 | `JEV_HOME` | data dir (default `~/.pave/jev`; holds `calibration.json`) |
