@@ -371,6 +371,12 @@ process.on('unhandledRejection', (err) => {
 });
 
 main().catch((err) => {
-  process.stderr.write('error: ' + (err && err.message ? err.message : String(err)) + '\n');
+  var msg = err && err.message ? err.message : String(err);
+  // Issue #318 / pave-epm #247: friendly message for the Jev add-on gate.
+  if (msg.indexOf('jev_addon_required') !== -1) {
+    process.stderr.write('Jev is a paid add-on. Get it on your PAVE dashboard.\n');
+  } else {
+    process.stderr.write('error: ' + msg + '\n');
+  }
   process.exit(1);
 });
