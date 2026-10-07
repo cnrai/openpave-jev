@@ -101,7 +101,9 @@ A fresh clone errors on every command until ONE of these is in place:
    Use `JEV_MODEL` to select the checkpoint
    (`cnrai/laya-english` | `cnrai/laya-multilingual` |
    `cnrai/laya-typed-decisions`). Fallback: `JEV_EPM_URL` + `JEV_API_KEY`
-   for standalone use.
+   for standalone use. Inside openpave the skill is sandbox-native: it calls
+   the host `authenticatedFetch` with the declared `epm` token (see skill.yaml),
+   so no key is read or sent at all when you're logged in.
 4. `-p mock` — deterministic fake for smoke tests.
 
 ## Guidance

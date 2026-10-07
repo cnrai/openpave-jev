@@ -255,3 +255,83 @@ test('providerStatus: not-installed laya detail gives both PATH and clone comman
     assert.match(laya.detail, /index\.js setup laya/, 'clone install form');
   });
 });
+
+test('epm provider: sandbox-native via authenticatedFetch("epm", ...) with no Authorization header', async () => {
+  const seen = [];
+  const prevFetch = globalThis.authenticatedFetch;
+  const saved = {};
+  for (const k of ['JEV_EPM_URL', 'PAVE_EPM_URL', 'PAVE_EPM_TOKEN_FILE', 'PAVE_EPM_JWT', 'JEV_API_KEY', 'JEV_MODEL']) saved[k] = process.env[k];
+  try {
+    globalThis.authenticatedFetch = function (name, url, opts) {
+      seen.push({ name, url, opts });
+      return {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: { get: function () { return null; } },
+        text: function () { return 'not the json'; },
+        json: function () {
+          return { answers: { q1: { type: 'noul', noul: 0.9, confidence: 0.9 } }, usage: { input_tokens: 5 } };
+        },
+      };
+    };
+    process.env.PAVE_EPM_URL = 'https://epm.openpave.ai/pave/v1';
+    delete process.env.JEV_EPM_URL;
+    delete process.env.PAVE_EPM_TOKEN_FILE;
+    delete process.env.PAVE_EPM_JWT;
+    delete process.env.JEV_API_KEY;
+    delete process.env.JEV_MODEL;
+    const provider = drivers.resolveProvider(null);
+    assert.strictEqual(provider.name, 'epm');
+    const result = await provider.ask({ text: 'hello' }, { q1: { type: 'noul' } }, {});
+    assert.strictEqual(seen.length, 1);
+    assert.strictEqual(seen[0].name, 'epm');
+    assert.strictEqual(seen[0].url, 'https://epm.openpave.ai/v1/decisions', 'sidecar /pave/v1 suffix stripped');
+    assert.strictEqual(seen[0].opts.method, 'POST');
+    assert.deepStrictEqual(seen[0].opts.headers, { 'content-type': 'application/json' });
+    assert.strictEqual(seen[0].opts.headers.Authorization, undefined, 'host injects the token — no Authorization header');
+    const body = JSON.parse(seen[0].opts.body);
+    assert.strictEqual(body.model, 'cnrai/laya-english');
+    assert.deepStrictEqual(body.state, { text: 'hello' });
+    assert.deepStrictEqual(body.questions, { q1: { type: 'noul' } });
+    assert.strictEqual(result.answers.q1.noul, 0.9, 'answers come from res.json()');
+    assert.strictEqual(result.usage.input_tokens, 5, 'usage comes from res.json()');
+    assert.strictEqual(result.provider, 'epm:https://epm.openpave.ai');
+  } finally {
+    if (prevFetch === undefined) delete globalThis.authenticatedFetch;
+    else globalThis.authenticatedFetch = prevFetch;
+    for (const k of Object.keys(saved)) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  }
+});
+
+test('drivers load sandbox-safely when http/https/url are unrequireable', () => {
+  const Module = require('module');
+  const origLoad = Module._load;
+  const blocked = ['http', 'https', 'url'];
+  const cacheKeys = ['../lib/drivers', '../lib/http', '../lib/laya'].map((p) => require.resolve(p));
+  const cached = cacheKeys.map((k) => require.cache[k]);
+  Module._load = function (request) {
+    if (blocked.indexOf(request) !== -1) {
+      throw new Error('module not available in sandbox: ' + request);
+    }
+    return origLoad.apply(this, arguments);
+  };
+  try {
+    // Simulate a fresh sandbox process: drop the eagerly-required modules so
+    // drivers re-requires http/laya while the sandbox loader is active.
+    for (const k of cacheKeys) delete require.cache[k];
+    const driversFresh = require('../lib/drivers');
+    const status = driversFresh.providerStatus();
+    assert.ok(status && typeof status === 'object', 'providerStatus must run in the simulated sandbox');
+    assert.deepStrictEqual(status.rows.map((r) => r.provider).sort(), ['epm', 'http', 'laya', 'mock', 'typesafe']);
+  } finally {
+    for (let i = 0; i < cacheKeys.length; i++) {
+      if (cached[i] === undefined) delete require.cache[cacheKeys[i]];
+      else require.cache[cacheKeys[i]] = cached[i];
+    }
+    Module._load = origLoad;
+  }
+});

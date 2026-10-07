@@ -20,6 +20,37 @@ category: development
 pattern: sandbox
 entrypoint: index.js
 
+# Sandbox tokens & permissions. PAVE_EPM_JWT is provisioned into the skill
+# process env by the openpave sidecar (see cnrai/openpave#2939).
+tokens:
+  epm:
+    type: api_key
+    description: pave-epm Decisions API JWT (provisioned from the openpave sidecar login)
+    domains:
+      - epm.openpave.ai
+    env:
+      required:
+        - PAVE_EPM_JWT
+    config:
+      env: PAVE_EPM_JWT
+      type: api_key
+      domains:
+        - epm.openpave.ai
+      placement:
+        type: header
+        name: Authorization
+        format: "Bearer {token}"
+permissions:
+  fs.read: []
+  fs.write: []
+  network:
+    - epm.openpave.ai
+  modules:
+    - fs
+    - path
+    - os
+  system: []
+
 # Available commands
 commands:
   - name: decide

@@ -156,3 +156,96 @@ test('resolveBase: opts override env, trailing slashes stripped', () => {  const
     else process.env.JEV_BASE_URL = saved;
   }
 });
+
+test('lib/http.js lazy-loads node network builtins (no top-level require)', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'http.js'), 'utf8');
+  const bad = src.split('\n').filter((line) => /^(const|var|let).*require\('(https?|url)'\)/.test(line));
+  assert.deepStrictEqual(bad, [], 'http/https/url must be required inside functions, not at module top level');
+});
+
+test('ask uses authenticatedFetch when tokenName is set and the global exists (sandbox-native)', async () => {
+  const seen = [];
+  const prev = globalThis.authenticatedFetch;
+  try {
+    globalThis.authenticatedFetch = function (name, url, opts) {
+      seen.push({ name, url, opts });
+      return {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: { get: function () { return null; } },
+        text: function () { return 'not the json'; },
+        json: function () {
+          return { answers: { q1: { type: 'noul', noul: 0.9, confidence: 0.9 } }, usage: { input_tokens: 5 } };
+        },
+      };
+    };
+    const result = await httpDriver.ask({ document: 'hello' }, { q1: { type: 'noul' } }, {
+      baseUrl: 'https://epm.openpave.ai',
+      path: '/v1/decisions',
+      model: 'cnrai/laya-english',
+      tokenName: 'epm',
+      providerName: 'epm:https://epm.openpave.ai',
+    });
+    assert.strictEqual(seen.length, 1);
+    assert.strictEqual(seen[0].name, 'epm');
+    assert.strictEqual(seen[0].url, 'https://epm.openpave.ai/v1/decisions');
+    assert.strictEqual(seen[0].opts.method, 'POST');
+    assert.deepStrictEqual(seen[0].opts.headers, { 'content-type': 'application/json' });
+    assert.strictEqual(seen[0].opts.headers.Authorization, undefined, 'host injects the token — no Authorization header');
+    const body = JSON.parse(seen[0].opts.body);
+    assert.strictEqual(body.model, 'cnrai/laya-english');
+    assert.deepStrictEqual(body.state, { document: 'hello' });
+    assert.deepStrictEqual(body.questions, { q1: { type: 'noul' } });
+    assert.strictEqual(result.answers.q1.noul, 0.9, 'answers come from res.json()');
+    assert.strictEqual(result.usage.input_tokens, 5, 'usage comes from res.json()');
+    assert.strictEqual(result.provider, 'epm:https://epm.openpave.ai');
+  } finally {
+    if (prev === undefined) delete globalThis.authenticatedFetch;
+    else globalThis.authenticatedFetch = prev;
+  }
+});
+
+test('ask maps non-ok authenticatedFetch status to the node error shape', async () => {
+  const prev = globalThis.authenticatedFetch;
+  try {
+    globalThis.authenticatedFetch = function () {
+      return {
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        headers: { get: function () { return null; } },
+        text: function () { return JSON.stringify({ error: 'boom' }); },
+        json: function () { return { error: 'boom' }; },
+      };
+    };
+    await assert.rejects(
+      () => httpDriver.ask({}, { q: { type: 'noul' } }, { baseUrl: 'https://epm.openpave.ai', path: '/v1/decisions', tokenName: 'epm' }),
+      (err) => /HTTP 500/.test(err.message) && /boom/.test(err.message)
+    );
+  } finally {
+    if (prev === undefined) delete globalThis.authenticatedFetch;
+    else globalThis.authenticatedFetch = prev;
+  }
+});
+
+test('ask throws a clear error when node http is unavailable (sandbox without authenticatedFetch)', async () => {
+  const Module = require('module');
+  const origLoad = Module._load;
+  Module._load = function (request) {
+    if (request === 'http' || request === 'https') {
+      throw new Error('Network module not available in sandbox. Use fetch() instead.');
+    }
+    return origLoad.apply(this, arguments);
+  };
+  try {
+    await assert.rejects(
+      () => httpDriver.ask({}, { q: { type: 'noul' } }, { baseUrl: 'http://127.0.0.1:1' }),
+      /network providers are unusable/
+    );
+  } finally {
+    Module._load = origLoad;
+  }
+});

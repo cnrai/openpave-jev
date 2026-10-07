@@ -60,6 +60,25 @@ test('providers exits 0 and lists every driver', () => {
   }
 });
 
+test('sandbox process shim: providers runs with no stdout/stderr/on/exit', () => {
+  const env = {};
+  for (const k of Object.keys(process.env)) {
+    if (!k.startsWith('JEV_')) env[k] = process.env[k];
+  }
+  env.JEV_HOME = path.join(os.tmpdir(), 'jev-sandbox-test-' + process.pid);
+  const fixture = path.join(__dirname, 'fixtures', 'minimal-process.js');
+  const r = spawnSync(process.execPath, ['-r', fixture, INDEX, 'providers'], {
+    encoding: 'utf8',
+    env,
+    timeout: 60000,
+  });
+  assert.strictEqual(r.status, 0, 'stderr: ' + r.stderr);
+  assert.ok(/selected provider/.test(r.stdout), 'got stdout: ' + r.stdout);
+  for (const name of ['mock', 'laya', 'http', 'typesafe', 'epm']) {
+    assert.ok(r.stdout.indexOf(name) !== -1, 'missing row: ' + name);
+  }
+});
+
 test('setup with an unsupported engine exits 2', () => {
   const r = jev(['setup', '--engine', 'bogus']);
   assert.strictEqual(r.status, 2);

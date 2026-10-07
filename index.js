@@ -48,6 +48,9 @@ State input:
 Providers:
   --provider mock|laya|http|typesafe|epm   or JEV_PROVIDER env; auto order:
   JEV_MOCK=1 > PAVE_EPM_URL (or JEV_EPM_URL) > JEV_BASE_URL > JEV_API_KEY > installed laya > error
+  Inside openpave the skill runs sandbox-native: the epm provider calls the host
+  authenticatedFetch with the declared epm token (no key handling when logged in).
+  Standalone keeps working via PAVE_EPM_TOKEN_FILE / ~/.pave/epm-token / JEV_API_KEY.
 
 Config:
   JEV_EPM_URL          base URL of the pave-epm Decisions API (overrides PAVE_EPM_URL)
@@ -65,12 +68,12 @@ Exit codes: 0 ok, 1 error, 2 usage, 3 confidence below --min-confidence
 Docs: docs/research.md, docs/calibration.md, docs/integrations.md`;
 
 function usageError(msg) {
-  process.stderr.write('error: ' + msg + '\n\n' + HELP + '\n');
-  process.exit(2);
+  util.writeStderr('error: ' + msg + '\n\n' + HELP + '\n');
+  util.exitProcess(2);
 }
 
 function out(obj) {
-  process.stdout.write(JSON.stringify(obj, null, 2) + '\n');
+  util.writeStdout(JSON.stringify(obj, null, 2) + '\n');
 }
 
 /** Shared option extraction for the single-question commands. */
@@ -154,15 +157,15 @@ async function cmdSingle(type, flags) {
   if (flags.quiet || flags.q) {
     const a = answers[name] || {};
     const val = qType === 'choice' ? a.choice : qType === 'score' ? a.score : a.noul;
-    process.stdout.write(String(val) + '\n');
+    util.writeStdout(String(val) + '\n');
   } else {
     out(payload);
   }
   if (gate) {
-    process.stderr.write(
+    util.writeStderr(
       JSON.stringify({ error: 'confidence gate', question: gate.name, confidence: gate.confidence, min: Number(flags['min-confidence']) }) + '\n'
     );
-    process.exit(3);
+    util.exitProcess(3);
   }
 }
 
@@ -201,18 +204,18 @@ function fmtMetricsRow(label, m) {
 
 function printEvalTable(report, title) {
   const header = ''.padEnd(28) + '    n' + '  acc'.padStart(9) + '  soft'.padStart(9) + ' brier'.padStart(9) + '   ece'.padStart(9) + '  mae'.padStart(9);
-  process.stdout.write(title + '\n' + header + '\n');
-  process.stdout.write(fmtMetricsRow('overall', report.overall) + '\n');
+  util.writeStdout(title + '\n' + header + '\n');
+  util.writeStdout(fmtMetricsRow('overall', report.overall) + '\n');
   for (const t of Object.keys(report.byType)) {
-    process.stdout.write(fmtMetricsRow('  type: ' + t, report.byType[t]) + '\n');
+    util.writeStdout(fmtMetricsRow('  type: ' + t, report.byType[t]) + '\n');
   }
   for (const q of Object.keys(report.byQuestion)) {
-    process.stdout.write(fmtMetricsRow('  q: ' + q, report.byQuestion[q]) + '\n');
+    util.writeStdout(fmtMetricsRow('  q: ' + q, report.byQuestion[q]) + '\n');
   }
   if (report.errors && report.errors.length) {
-    process.stdout.write('\nfirst errors (max 10):\n');
+    util.writeStdout('\nfirst errors (max 10):\n');
     for (const e of report.errors) {
-      process.stdout.write('  ' + e.name + ': expected ' + JSON.stringify(e.expected) + ', got ' + JSON.stringify(e.got) + ' (conf ' + e.confidence + ')\n');
+      util.writeStdout('  ' + e.name + ': expected ' + JSON.stringify(e.expected) + ', got ' + JSON.stringify(e.got) + ' (conf ' + e.confidence + ')\n');
     }
   }
 }
@@ -275,37 +278,37 @@ async function cmdCalibrate(flags) {
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, JSON.stringify(calibration, null, 2) + '\n');
 
-  process.stdout.write('calibration saved: ' + outPath + '\n\n');
+  util.writeStdout('calibration saved: ' + outPath + '\n\n');
   const bucketKeys = Object.keys(calibration.buckets);
   if (!bucketKeys.length) {
-    process.stdout.write('no bucket had >= 4 usable labeled samples - nothing fitted\n');
+    util.writeStdout('no bucket had >= 4 usable labeled samples - nothing fitted\n');
     return;
   }
-  process.stdout.write('fitted temperatures (T>1 = model was over-confident):\n');
+  util.writeStdout('fitted temperatures (T>1 = model was over-confident):\n');
   for (const k of bucketKeys) {
     const b = calibration.buckets[k];
-    process.stdout.write('  ' + k.padEnd(14) + ' T=' + b.T.toFixed(4) + '  (n=' + b.n + ')\n');
+    util.writeStdout('  ' + k.padEnd(14) + ' T=' + b.T.toFixed(4) + '  (n=' + b.n + ')\n');
   }
   if (report) {
-    process.stdout.write('\neval half (odd indices), before vs after:\n');
+    util.writeStdout('\neval half (odd indices), before vs after:\n');
     const before = report.uncalibrated ? report.uncalibrated.overall : null;
     const after = report.calibrated ? report.calibrated.overall : null;
     if (before && after) {
-      process.stdout.write('  accuracy ' + before.accuracy + ' -> ' + after.accuracy + '\n');
-      process.stdout.write('  brier    ' + before.brier + ' -> ' + after.brier + '\n');
-      process.stdout.write('  ece      ' + before.ece + ' -> ' + after.ece + '\n');
+      util.writeStdout('  accuracy ' + before.accuracy + ' -> ' + after.accuracy + '\n');
+      util.writeStdout('  brier    ' + before.brier + ' -> ' + after.brier + '\n');
+      util.writeStdout('  ece      ' + before.ece + ' -> ' + after.ece + '\n');
     } else {
-      process.stdout.write('  (report unavailable - check dataset size)\n');
+      util.writeStdout('  (report unavailable - check dataset size)\n');
     }
   }
 }
 
 function cmdProviders() {
   const status = drivers.providerStatus();
-  process.stdout.write('selected provider: ' + status.selected + '\n\n');
+  util.writeStdout('selected provider: ' + status.selected + '\n\n');
   for (const row of status.rows) {
     const mark = row.available ? '[x]' : '[ ]';
-    process.stdout.write(mark + ' ' + row.provider.padEnd(10) + ' ' + row.detail + '\n');
+    util.writeStdout(mark + ' ' + row.provider.padEnd(10) + ' ' + row.detail + '\n');
   }
 }
 
@@ -314,27 +317,27 @@ function cmdSetup(flags) {
   if (engine !== 'laya') usageError('setup currently supports only: laya');
   const nodeMajor = Number(process.versions.node.split('.')[0]);
   if (nodeMajor < 20 && !flags['skip-check']) {
-    process.stderr.write(
+    util.writeStderr(
       'error: @receptron/laya requires Node 20+ (current ' + process.version + ').\n' +
         'Install a newer Node side-by-side, or re-run with --skip-check to try anyway.\n'
     );
-    process.exit(1);
+    util.exitProcess(1);
   }
-  process.stdout.write('installing @receptron/laya into ' + SKILL_ROOT + ' (weights ~1.7GB download on first use)\n');
+  util.writeStdout('installing @receptron/laya into ' + SKILL_ROOT + ' (weights ~1.7GB download on first use)\n');
   const res = spawnSync('npm', ['install', '--no-save', '@receptron/laya'], { cwd: SKILL_ROOT, stdio: 'inherit' });
   if (res.error) {
-    process.stderr.write('failed to run npm: ' + res.error.message + '\n');
-    process.exit(1);
+    util.writeStderr('failed to run npm: ' + res.error.message + '\n');
+    util.exitProcess(1);
   }
-  if (res.status !== 0) process.exit(res.status || 1);
-  process.stdout.write('\ndone. try: jev decide --provider laya -s "refund not received" -c "billing,support,sales"\n');
-  process.stdout.write('  or: jev decide --provider epm -s "refund not received" -c "billing,support,sales" --model cnrai/laya-multilingual\n');
+  if (res.status !== 0) util.exitProcess(res.status || 1);
+  util.writeStdout('\ndone. try: jev decide --provider laya -s "refund not received" -c "billing,support,sales"\n');
+  util.writeStdout('  or: jev decide --provider epm -s "refund not received" -c "billing,support,sales" --model cnrai/laya-multilingual\n');
 }
 
 async function main() {
-  const argv = process.argv.slice(2);
+  const argv = process.argv && typeof process.argv.slice === 'function' ? process.argv.slice(2) : [];
   if (!argv.length || argv[0] === 'help' || argv[0] === '--help') {
-    process.stdout.write(HELP + '\n');
+    util.writeStdout(HELP + '\n');
     return;
   }
   const command = argv[0].startsWith('-') ? null : argv[0];
@@ -365,18 +368,23 @@ async function main() {
   }
 }
 
-process.on('unhandledRejection', (err) => {
-  process.stderr.write('error: ' + (err && err.stack ? err.stack : String(err)) + '\n');
-  process.exit(1);
-});
+// The sandbox process shim has no event emitter; only register the handler
+// where process.on exists (real Node). Unhandled rejections there surface via
+// main().catch below instead.
+if (typeof process.on === 'function') {
+  process.on('unhandledRejection', (err) => {
+    util.writeStderr('error: ' + (err && err.stack ? err.stack : String(err)) + '\n');
+    util.exitProcess(1);
+  });
+}
 
 main().catch((err) => {
   var msg = err && err.message ? err.message : String(err);
   // Issue #318 / pave-epm #247: friendly message for the Jev add-on gate.
   if (msg.indexOf('jev_addon_required') !== -1) {
-    process.stderr.write('Jev is a paid add-on. Get it on your PAVE dashboard.\n');
+    util.writeStderr('Jev is a paid add-on. Get it on your PAVE dashboard.\n');
   } else {
-    process.stderr.write('error: ' + msg + '\n');
+    util.writeStderr('error: ' + msg + '\n');
   }
-  process.exit(1);
+  util.exitProcess(1);
 });
