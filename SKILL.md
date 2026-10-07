@@ -93,7 +93,11 @@ A fresh clone errors on every command until ONE of these is in place:
    [pave-epm](https://github.com/candrholdings/pave-epm) Decisions API gateway
    (`POST /v1/decisions`, OpenRouter alpha/decisions shape, `model` field
    required). Set automatically by the openpave/pave-studio sidecar on login —
-   the `epm` provider reads the JWT from `PAVE_EPM_TOKEN_FILE` for auth.
+   the `epm` provider reads the JWT from `PAVE_EPM_TOKEN_FILE` for auth
+   (falling back to `~/.pave/epm-token`, mirroring the pave server, then to
+   `JEV_API_KEY`). The sidecar's `PAVE_EPM_URL` ends in `/pave/v1` (the chat
+   gateway base); the provider strips that suffix and posts to
+   `<root>/v1/decisions`.
    Use `JEV_MODEL` to select the checkpoint
    (`cnrai/laya-english` | `cnrai/laya-multilingual` |
    `cnrai/laya-typed-decisions`). Fallback: `JEV_EPM_URL` + `JEV_API_KEY`

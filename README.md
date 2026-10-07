@@ -79,8 +79,8 @@ Exit codes: `0` ok · `1` error · `2` usage · `3` below `--min-confidence`.
 | `JEV_BASE_URL` | base URL of a `/v1/systemone` server |
 | `JEV_EPM_URL` | base URL of the pave-epm Decisions API (overrides `PAVE_EPM_URL` for the `epm` provider) |
 | `JEV_MODEL` | which decision model the `epm` provider sends (default `cnrai/laya-english`; also `cnrai/laya-multilingual`, `cnrai/laya-typed-decisions`) |
-| `PAVE_EPM_URL` | base URL of the EPM (set by the openpave/pave-studio sidecar on login; the `epm` provider auto-selects when this is set) |
-| `PAVE_EPM_TOKEN_FILE` | path to the EPM JWT file (set by the sidecar on login; the `epm` provider reads it for auth — no `JEV_API_KEY` needed when logged in) |
+| `PAVE_EPM_URL` | base URL of the EPM (set by the openpave/pave-studio sidecar on login; the `epm` provider auto-selects when this is set). The sidecar's value ends in `/pave/v1` (the chat gateway base) — the provider strips that suffix and posts to `<root>/v1/decisions`. |
+| `PAVE_EPM_TOKEN_FILE` | path to the EPM JWT file (set by the sidecar on login; the `epm` provider reads it for auth — no `JEV_API_KEY` needed when logged in). Auth resolution mirrors the pave server: `PAVE_EPM_JWT` → `PAVE_EPM_TOKEN_FILE` → `JEV_API_KEY`/`tokens.yaml` → `~/.pave/epm-token`. |
 | `JEV_PROVIDER` | default provider (`mock|laya|http|typesafe|epm`) |
 | `JEV_MOCK` | `1` forces the mock driver |
 | `JEV_HOME` | data dir (default `~/.pave/jev`; holds `calibration.json`) |
