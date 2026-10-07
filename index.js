@@ -46,12 +46,16 @@ State input:
   (also reads stdin when no state flag is given)
 
 Providers:
-  --provider mock|laya|http|typesafe   or JEV_PROVIDER env; auto order:
-  JEV_MOCK=1 > JEV_BASE_URL > JEV_API_KEY > installed laya > error
+  --provider mock|laya|http|typesafe|epm   or JEV_PROVIDER env; auto order:
+  JEV_MOCK=1 > PAVE_EPM_URL (or JEV_EPM_URL) > JEV_BASE_URL > JEV_API_KEY > installed laya > error
 
 Config:
-  JEV_API_KEY          TypeSafe Jev API key (or JEV_API_KEY in ~/.pave/tokens.yaml)
+  JEV_EPM_URL          base URL of the pave-epm Decisions API (overrides PAVE_EPM_URL)
+  JEV_API_KEY          TypeSafe Jev API key (or JEV_API_KEY in ~/.pave/tokens.yaml; fallback for the epm provider)
+  PAVE_EPM_URL         base URL of the EPM (set by the openpave/pave-studio sidecar on login)
+  PAVE_EPM_TOKEN_FILE  path to the EPM JWT file (set by the sidecar; the epm provider reads it for auth — falls back to ~/.pave/epm-token, mirroring the pave server)
   JEV_BASE_URL         base URL of a /v1/systemone server (e.g. http://127.0.0.1:8000)
+  JEV_MODEL            decision model for the epm provider (cnrai/laya-english | cnrai/laya-multilingual | cnrai/laya-typed-decisions)
   JEV_PROVIDER         default provider
   JEV_HOME             data dir (default ~/.pave/jev; holds calibration.json)
   JEV_LAYA_CHECKPOINT  english (default) | multilingual | typed-decisions
@@ -75,6 +79,7 @@ function commonOpts(flags) {
     provider: flags.provider || flags.p,
     checkpoint: flags.checkpoint,
     baseUrl: flags['base-url'],
+    model: flags.model,
   };
 }
 
@@ -100,6 +105,7 @@ async function askWithPipeline(provider, state, questions, flags, opts) {
   const result = await provider.ask(state, questions, {
     checkpoint: o.checkpoint,
     baseUrl: o.baseUrl,
+    model: o.model,
   });
   const useCal = !flags['no-calibrate'] && !o.skipCalibration;
   const calibration = useCal ? util.loadCalibration() : null;
@@ -322,6 +328,7 @@ function cmdSetup(flags) {
   }
   if (res.status !== 0) process.exit(res.status || 1);
   process.stdout.write('\ndone. try: jev decide --provider laya -s "refund not received" -c "billing,support,sales"\n');
+  process.stdout.write('  or: jev decide --provider epm -s "refund not received" -c "billing,support,sales" --model cnrai/laya-multilingual\n');
 }
 
 async function main() {
@@ -364,6 +371,12 @@ process.on('unhandledRejection', (err) => {
 });
 
 main().catch((err) => {
-  process.stderr.write('error: ' + (err && err.message ? err.message : String(err)) + '\n');
+  var msg = err && err.message ? err.message : String(err);
+  // Issue #318 / pave-epm #247: friendly message for the Jev add-on gate.
+  if (msg.indexOf('jev_addon_required') !== -1) {
+    process.stderr.write('Jev is a paid add-on. Get it on your PAVE dashboard.\n');
+  } else {
+    process.stderr.write('error: ' + msg + '\n');
+  }
   process.exit(1);
 });
