@@ -306,3 +306,32 @@ test('epm provider: sandbox-native via authenticatedFetch("epm", ...) with no Au
     }
   }
 });
+
+test('drivers load sandbox-safely when http/https/url are unrequireable', () => {
+  const Module = require('module');
+  const origLoad = Module._load;
+  const blocked = ['http', 'https', 'url'];
+  const cacheKeys = ['../lib/drivers', '../lib/http', '../lib/laya'].map((p) => require.resolve(p));
+  const cached = cacheKeys.map((k) => require.cache[k]);
+  Module._load = function (request) {
+    if (blocked.indexOf(request) !== -1) {
+      throw new Error('module not available in sandbox: ' + request);
+    }
+    return origLoad.apply(this, arguments);
+  };
+  try {
+    // Simulate a fresh sandbox process: drop the eagerly-required modules so
+    // drivers re-requires http/laya while the sandbox loader is active.
+    for (const k of cacheKeys) delete require.cache[k];
+    const driversFresh = require('../lib/drivers');
+    const status = driversFresh.providerStatus();
+    assert.ok(status && typeof status === 'object', 'providerStatus must run in the simulated sandbox');
+    assert.deepStrictEqual(status.rows.map((r) => r.provider).sort(), ['epm', 'http', 'laya', 'mock', 'typesafe']);
+  } finally {
+    for (let i = 0; i < cacheKeys.length; i++) {
+      if (cached[i] === undefined) delete require.cache[cacheKeys[i]];
+      else require.cache[cacheKeys[i]] = cached[i];
+    }
+    Module._load = origLoad;
+  }
+});
