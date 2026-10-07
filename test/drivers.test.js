@@ -255,3 +255,54 @@ test('providerStatus: not-installed laya detail gives both PATH and clone comman
     assert.match(laya.detail, /index\.js setup laya/, 'clone install form');
   });
 });
+
+test('epm provider: sandbox-native via authenticatedFetch("epm", ...) with no Authorization header', async () => {
+  const seen = [];
+  const prevFetch = globalThis.authenticatedFetch;
+  const saved = {};
+  for (const k of ['JEV_EPM_URL', 'PAVE_EPM_URL', 'PAVE_EPM_TOKEN_FILE', 'PAVE_EPM_JWT', 'JEV_API_KEY', 'JEV_MODEL']) saved[k] = process.env[k];
+  try {
+    globalThis.authenticatedFetch = function (name, url, opts) {
+      seen.push({ name, url, opts });
+      return {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: { get: function () { return null; } },
+        text: function () { return 'not the json'; },
+        json: function () {
+          return { answers: { q1: { type: 'noul', noul: 0.9, confidence: 0.9 } }, usage: { input_tokens: 5 } };
+        },
+      };
+    };
+    process.env.PAVE_EPM_URL = 'https://epm.openpave.ai/pave/v1';
+    delete process.env.JEV_EPM_URL;
+    delete process.env.PAVE_EPM_TOKEN_FILE;
+    delete process.env.PAVE_EPM_JWT;
+    delete process.env.JEV_API_KEY;
+    delete process.env.JEV_MODEL;
+    const provider = drivers.resolveProvider(null);
+    assert.strictEqual(provider.name, 'epm');
+    const result = await provider.ask({ text: 'hello' }, { q1: { type: 'noul' } }, {});
+    assert.strictEqual(seen.length, 1);
+    assert.strictEqual(seen[0].name, 'epm');
+    assert.strictEqual(seen[0].url, 'https://epm.openpave.ai/v1/decisions', 'sidecar /pave/v1 suffix stripped');
+    assert.strictEqual(seen[0].opts.method, 'POST');
+    assert.deepStrictEqual(seen[0].opts.headers, { 'content-type': 'application/json' });
+    assert.strictEqual(seen[0].opts.headers.Authorization, undefined, 'host injects the token — no Authorization header');
+    const body = JSON.parse(seen[0].opts.body);
+    assert.strictEqual(body.model, 'cnrai/laya-english');
+    assert.deepStrictEqual(body.state, { text: 'hello' });
+    assert.deepStrictEqual(body.questions, { q1: { type: 'noul' } });
+    assert.strictEqual(result.answers.q1.noul, 0.9, 'answers come from res.json()');
+    assert.strictEqual(result.usage.input_tokens, 5, 'usage comes from res.json()');
+    assert.strictEqual(result.provider, 'epm:https://epm.openpave.ai');
+  } finally {
+    if (prevFetch === undefined) delete globalThis.authenticatedFetch;
+    else globalThis.authenticatedFetch = prevFetch;
+    for (const k of Object.keys(saved)) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  }
+});

@@ -48,6 +48,9 @@ State input:
 Providers:
   --provider mock|laya|http|typesafe|epm   or JEV_PROVIDER env; auto order:
   JEV_MOCK=1 > PAVE_EPM_URL (or JEV_EPM_URL) > JEV_BASE_URL > JEV_API_KEY > installed laya > error
+  Inside openpave the skill runs sandbox-native: the epm provider calls the host
+  authenticatedFetch with the declared epm token (no key handling when logged in).
+  Standalone keeps working via PAVE_EPM_TOKEN_FILE / ~/.pave/epm-token / JEV_API_KEY.
 
 Config:
   JEV_EPM_URL          base URL of the pave-epm Decisions API (overrides PAVE_EPM_URL)
