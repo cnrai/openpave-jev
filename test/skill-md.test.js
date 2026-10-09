@@ -10,6 +10,7 @@ const { spawnSync } = require('node:child_process');
 const ROOT = path.join(__dirname, '..');
 const SKILL_MD = path.join(ROOT, 'SKILL.md');
 const SKILL_YAML = path.join(ROOT, 'skill.yaml');
+const PACKAGE_JSON = path.join(ROOT, 'package.json');
 
 /**
  * Extract the YAML front-matter block of a markdown file with a regex.
@@ -67,7 +68,11 @@ test('smoke: node index.js noul -s smoke -p mock exits 0 with a numeric answer.n
   assert.strictEqual(typeof parsed.answer.noul, 'number', 'answer.noul must be a number');
 });
 
-test('skill.yaml declares version 0.2.0', () => {
+test('skill.yaml and package.json declare the same semver version', () => {
   const yaml = fs.readFileSync(SKILL_YAML, 'utf8');
-  assert.match(yaml, /^version:\s*0\.2\.0\s*$/m, 'skill.yaml version must be 0.2.0');
+  const pkg = JSON.parse(fs.readFileSync(PACKAGE_JSON, 'utf8'));
+  const yamlVersion = (yaml.match(/^version:\s*(\d+\.\d+\.\d+)\s*$/m) || [])[1];
+  assert.ok(yamlVersion, 'skill.yaml must declare a semver version');
+  assert.strictEqual(pkg.version, yamlVersion,
+    'skill.yaml and package.json versions must match — updateSkill() compares the skill.yaml version to detect updates, so drift strands installed machines (see cnrai/openpave-jev #6/#7, shipped code without a bump)');
 });
